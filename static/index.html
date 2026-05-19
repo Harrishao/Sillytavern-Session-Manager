@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ST Session Manager</title>
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --panel: #1a1a2e;
+    --border: #2a2a4a;
+    --text: #c8c8d8;
+    --dim: #6a6a8a;
+    --accent: #7c6ff7;
+    --accent-hover: #9b8ffb;
+    --danger: #e0556a;
+    --success: #4caf93;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+  }
+  .layout { display:flex; height:100vh; }
+  .sidebar {
+    width:280px; background:var(--panel); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0;
+  }
+  .sidebar h3 {
+    padding:16px 20px 8px; color:var(--dim); font-size:11px;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+  .sidebar .list {
+    flex:1; overflow-y:auto; padding:0 8px;
+  }
+  .sidebar .item {
+    padding:8px 12px; cursor:pointer; border-radius:6px; font-size:13px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .sidebar .item:hover { background:rgba(124,111,247,0.1); }
+  .sidebar .item.active { background:rgba(124,111,247,0.2); color:var(--accent); }
+  .main {
+    flex:1; display:flex; flex-direction:column; min-width:0;
+  }
+  .topbar {
+    padding:12px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px;
+  }
+  .topbar h1 { font-size:16px; font-weight:600; letter-spacing:0.5px; }
+  .topbar .dot { width:8px; height:8px; border-radius:50%; background:var(--success); }
+  .content { flex:1; display:flex; flex-direction:column; overflow-y:auto; padding:20px; }
+  .input-area {
+    display:flex; gap:12px; margin-bottom:16px;
+  }
+  .input-area textarea {
+    flex:1; background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); padding:12px;
+    font-size:14px; resize:none; min-height:60px; font-family:inherit;
+  }
+  .input-area textarea:focus { outline:none; border-color:var(--accent); }
+  .btn {
+    padding:8px 16px; border:none; border-radius:6px; cursor:pointer;
+    font-size:13px; font-weight:500; transition:.15s; font-family:inherit;
+  }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-sm { padding:4px 10px; font-size:12px; }
+  .btn-outline {
+    background:transparent; border:1px solid var(--border); color:var(--text);
+  }
+  .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-danger { background:var(--danger); color:#fff; }
+  .btn-danger:hover { opacity:0.85; }
+  .toolbar {
+    display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;
+  }
+  .status {
+    padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:12px;
+    display:none;
+  }
+  .status.info { background:rgba(124,111,247,0.15); color:var(--accent); }
+  .status.error { background:rgba(224,85,106,0.15); color:var(--danger); }
+  .status.success { background:rgba(76,175,147,0.15); color:var(--success); }
+  .result-area {
+    flex:1; display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto;
+  }
+  .msg-box {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; padding:16px; font-size:14px; line-height:1.6;
+    white-space:pre-wrap; word-break:break-word; max-height:300px; overflow-y:auto;
+  }
+  .screenshot-box {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; overflow:hidden;
+  }
+  .screenshot-box img { width:100%; display:block; }
+  .screenshot-box .placeholder {
+    padding:40px; text-align:center; color:var(--dim); font-size:13px;
+  }
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <h3>角色卡</h3>
+    <div class="list" id="char-list"><div class="item" style="color:var(--dim)">加载中...</div></div>
+    <h3>聊天列表</h3>
+    <div class="list" id="chat-list"><div class="item" style="color:var(--dim)">选择角色后显示</div></div>
+  </div>
+
+  <!-- 主区域 -->
+  <div class="main">
+    <div class="topbar">
+      <span class="dot" id="status-dot"></span>
+      <h1>ST Session Manager</h1>
+    </div>
+
+    <div class="content">
+      <!-- 输入区 -->
+      <div class="input-area">
+        <textarea id="msg-input" placeholder="输入要发送给酒馆的消息..." rows="2"></textarea>
+        <button class="btn btn-primary" onclick="doSend()">发送</button>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <button class="btn btn-outline btn-sm" onclick="doStop()">停止生成</button>
+        <button class="btn btn-outline btn-sm" onclick="doSwipeLeft()">← 左翻页</button>
+        <button class="btn btn-outline btn-sm" onclick="doSwipeRight()">右翻页 →</button>
+        <button class="btn btn-outline btn-sm" onclick="doRegenerate()">重新生成</button>
+        <button class="btn btn-outline btn-sm" onclick="doRefresh()">刷新页面</button>
+        <button class="btn btn-outline btn-sm" onclick="doMsgScreenshot()">截屏消息</button>
+        <button class="btn btn-outline btn-sm" onclick="doFullScreenshot()">截屏全页</button>
+        <button class="btn btn-danger btn-sm" onclick="doDeleteMsg()">删除最后1条</button>
+      </div>
+
+      <!-- 状态 -->
+      <div class="status" id="status-msg"></div>
+
+      <!-- 结果区 -->
+      <div class="result-area">
+        <div class="msg-box" id="response-box" style="display:none"></div>
+        <div class="screenshot-box" id="screenshot-box">
+          <div class="placeholder">截图将在此处显示</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+function setStatus(text, type) {
+  const el = $('#status-msg');
+  el.textContent = text;
+  el.className = 'status ' + type;
+  el.style.display = 'block';
+}
+
+async function api(url, opts = {}) {
+  try {
+    const resp = await fetch(url, { headers: {'Content-Type':'application/json'}, ...opts });
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error||resp.statusText); }
+    return await resp.json();
+  } catch (err) {
+    setStatus(err.message, 'error');
+    throw err;
+  }
+}
+
+async function loadCharacters() {
+  try {
+    const chars = await api('/api/characters');
+    const list = $('#char-list');
+    if (!chars.length) { list.innerHTML = '<div class="item" style="color:var(--dim)">无角色卡</div>'; return; }
+    list.innerHTML = chars.map((c,i) =>
+      `<div class="item" data-idx="${i}" data-avatar="${c.avatar||''}" onclick="selectChar(this)">${c.name||'未命名'}</div>`
+    ).join('');
+  } catch(_) {}
+}
+
+async function selectChar(el) {
+  document.querySelectorAll('#char-list .item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  const avatar = el.dataset.avatar;
+  if (!avatar) return;
+  try {
+    const chats = await api(`/api/character-chats?avatar_url=${encodeURIComponent(avatar)}`);
+    const list = $('#chat-list');
+    if (!Array.isArray(chats) || !chats.length) {
+      list.innerHTML = '<div class="item" style="color:var(--dim)">该角色无聊天记录</div>';
+      return;
+    }
+    list.innerHTML = chats.map((c,i) =>
+      `<div class="item" data-file="${c.file_name||''}" onclick="openChat(this)">${c.file_name||'未知聊天'}</div>`
+    ).join('');
+  } catch(_){}
+}
+
+async function openChat(el) {
+  const file = el.dataset.file;
+  if (!file) return;
+  document.querySelectorAll('#chat-list .item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  await api('/api/open-chat', {method:'POST', body:JSON.stringify({file_name:file})});
+  setStatus(`已切换到聊天: ${file}`, 'success');
+}
+
+async function doSend() {
+  const text = $('#msg-input').value.trim();
+  if (!text) return;
+  $('#msg-input').value = '';
+  setStatus('正在发送并等待回复...', 'info');
+  try {
+    const result = await api('/api/send', {method:'POST', body: JSON.stringify({text})});
+    $('#response-box').style.display = 'block';
+    $('#response-box').textContent = result.content || '(空回复)';
+    if (result.screenshot_path) {
+      const fname = result.screenshot_path.replace(/\\/g,'/').split('/').pop();
+      $('#screenshot-box').innerHTML = `<img src="/api/screenshot/${fname}" alt="screenshot">`;
+    }
+    setStatus('完成', 'success');
+  } catch(_) {}
+}
+
+async function doStop() {
+  await api('/api/stop', {method:'POST'});
+  setStatus('已发送停止指令', 'info');
+}
+
+async function doSwipeLeft() {
+  setStatus('执行左翻页...', 'info');
+  const r = await api('/api/swipe-left', {method:'POST'});
+  setStatus(r.ok ? '左翻页完成' : '左翻页失败', r.ok?'success':'error');
+  if (r.ok) await refreshScreenshot();
+}
+
+async function doSwipeRight() {
+  setStatus('执行右翻页...', 'info');
+  const r = await api('/api/swipe-right', {method:'POST'});
+  setStatus(r.status||'完成', r.ok?'success':'error');
+  if (r.ok) await refreshScreenshot();
+}
+
+async function doRegenerate() {
+  setStatus('触发重新生成...', 'info');
+  await api('/api/regenerate', {method:'POST'});
+  setStatus('重新生成已触发，等待完成...', 'info');
+  try {
+    const r = await api('/api/wait');
+    $('#response-box').style.display = 'block';
+    $('#response-box').textContent = r.content || '(空回复)';
+    if (r.screenshot_path) {
+      const fname = r.screenshot_path.replace(/\\/g,'/').split('/').pop();
+      $('#screenshot-box').innerHTML = `<img src="/api/screenshot/${fname}" alt="screenshot">`;
+    }
+    setStatus('重新生成完成', 'success');
+  } catch(_){}
+}
+
+async function doRefresh() {
+  setStatus('正在刷新页面...', 'info');
+  const r = await api('/api/refresh', {method:'POST'});
+  setStatus(r.ok ? '页面已刷新' : '刷新失败', r.ok?'success':'error');
+}
+
+async function doMsgScreenshot() {
+  setStatus('截取最后一条消息...', 'info');
+  const r = await api('/api/screenshot-now');
+  if (r.path) {
+    const fname = r.path.replace(/\\/g,'/').split('/').pop();
+    $('#screenshot-box').innerHTML = `<img src="/api/screenshot/${fname}?t=${Date.now()}" alt="msg screenshot">`;
+    setStatus('消息截图完成', 'success');
+  }
+}
+
+async function doFullScreenshot() {
+  setStatus('截取全页...', 'info');
+  const r = await api('/api/full-screenshot');
+  if (r.path) {
+    const fname = r.path.replace(/\\/g,'/').split('/').pop();
+    $('#screenshot-box').innerHTML = `<img src="/api/screenshot/${fname}?t=${Date.now()}" alt="full screenshot">`;
+    setStatus('全页截图完成', 'success');
+  }
+}
+
+async function doDeleteMsg() {
+  if (!confirm('确认删除当前聊天最后1条消息？')) return;
+  const r = await api('/api/delete-messages', {method:'POST', body:JSON.stringify({n:1})});
+  setStatus(r.ok ? '已删除' : '删除失败', r.ok?'success':'error');
+}
+
+async function refreshScreenshot() {
+  const r = await api('/api/screenshot-now');
+  if (r.path) {
+    const fname = r.path.replace(/\\/g,'/').split('/').pop();
+    $('#screenshot-box').innerHTML = `<img src="/api/screenshot/${fname}?t=${Date.now()}" alt="screenshot">`;
+  }
+}
+
+// 键盘快捷键
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doSend(); }
+});
+
+// 启动
+loadCharacters();
+</script>
+</body>
+</html>
