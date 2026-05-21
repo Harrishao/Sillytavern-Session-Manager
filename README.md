@@ -2,7 +2,8 @@
 
 预计将用于对接聊天平台机器人
 
-已实现的项目 https://github.com/Harrishao/NC-Relay2ST
+该项目的实际应用 https://github.com/Harrishao/Sillytavern-Relay2-Anything 
+
 
 可以做到的事: 
 

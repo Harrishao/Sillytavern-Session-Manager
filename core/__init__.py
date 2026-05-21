@@ -31,4 +31,7 @@ from .api import (
     open_chat,
     delete_messages,
     delete_chat,
+    fetch_personas,
+    select_persona,
+    get_current_persona,
 )

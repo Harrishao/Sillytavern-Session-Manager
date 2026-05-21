@@ -224,6 +224,33 @@ async def api_delete_chat(request: Request):
     return JSONResponse({"ok": ok})
 
 
+# ---------- 用户设定 API ----------
+
+@app.get("/api/personas")
+async def api_personas():
+    """获取用户设定列表"""
+    personas = await core.fetch_personas()
+    return JSONResponse(personas)
+
+
+@app.post("/api/select-persona")
+async def api_select_persona(request: Request):
+    """选择用户设定"""
+    data = await request.json()
+    avatar_id = data.get("avatar_id", "")
+    if not avatar_id:
+        return JSONResponse({"error": "avatar_id required"}, status_code=400)
+    ok = await core.select_persona(avatar_id)
+    return JSONResponse({"ok": ok, "current": await core.get_current_persona()})
+
+
+@app.get("/api/current-persona")
+async def api_current_persona():
+    """获取当前激活的用户设定"""
+    name = await core.get_current_persona()
+    return JSONResponse({"name": name})
+
+
 # ---------- 入口 ----------
 
 def main():
